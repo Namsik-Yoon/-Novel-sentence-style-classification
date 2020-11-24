@@ -1,17 +1,17 @@
-{
+{   
     "n_enc_vocab": 0,
     "n_dec_vocab": 0,
-    "n_enc_seq": 512,
-    "n_dec_seq": 512,
+    "n_enc_seq": 1024,
+    "n_dec_seq": 1024,
     "n_layer": 5,
     "d_hidn": 768,
     "i_pad": 0,
-    "d_ff": 512,
+    "d_ff": 128,
     "n_head": 16,
     "d_head": 64,
     "dropout": 0.1,
     "layer_norm_epsilon": 1e-12,
-    "batch_size": 32,
+    "batch_size": 512,
     "n_output": 5,
     "train_ratio":0.8,
     "Optim": {
