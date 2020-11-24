@@ -155,7 +155,6 @@ class Encoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-
         self.enc_emb = nn.Embedding(self.config.n_enc_vocab, self.config.d_hidn)
         sinusoid_table = torch.FloatTensor(get_sinusoid_encoding_table(self.config.n_enc_seq + 1, self.config.d_hidn))
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_table, freeze=True)
@@ -220,7 +219,6 @@ class Decoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-
         self.dec_emb = nn.Embedding(self.config.n_dec_vocab, self.config.d_hidn)
         sinusoid_table = torch.FloatTensor(get_sinusoid_encoding_table(self.config.n_dec_seq + 1, self.config.d_hidn))
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_table, freeze=True)
