@@ -1,11 +1,25 @@
 import json
 import torch
+import random
+import numpy as np
 import torch.nn as nn
 from sklearn.metrics import f1_score
 from Dataset import TextDataset
 from Model import Classification
+from Model import Conv1dRNN
 
 """ configuration json을 읽어들이는 class """
+
+random_seed = 42
+
+torch.manual_seed(random_seed)
+torch.cuda.manual_seed(random_seed)
+torch.cuda.manual_seed_all(random_seed) # if use multi-GPU
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(random_seed)
+random.seed(random_seed)
+
 
 
 class Config(dict):
@@ -53,7 +67,7 @@ def collate_fn(inputs):
     return batch
 
 
-def train(model, loader, criterion, optimizer):
+def train(model, loader, criterion, optimizer, config):
     model.cuda()
     model.train()
     train_losses = []
@@ -66,8 +80,11 @@ def train(model, loader, criterion, optimizer):
         enc_inputs, dec_inputs, labels = data
         enc_inputs, dec_inputs, labels = enc_inputs.cuda(), dec_inputs.cuda(), labels.cuda()
         optimizer.zero_grad()
-        output = model(enc_inputs, dec_inputs)
-        y_pred = output[0]
+        if config.model == "conv1drnn":
+            y_pred = model(enc_inputs)
+        else:
+            output = model(enc_inputs, dec_inputs)
+            y_pred = output[0]
 
         loss = criterion(y_pred, labels)
         loss.backward()
@@ -82,7 +99,7 @@ def train(model, loader, criterion, optimizer):
     return model, sum(train_losses) / (idx + 1), f1_score(outputs, targets, average='macro'), train_corr / train_cnt
 
 
-def evaluate(model, loader, criterion):
+def evaluate(model, loader, criterion, config):
     model.cuda()
     model.eval()
     eval_losses = []
@@ -95,8 +112,11 @@ def evaluate(model, loader, criterion):
         enc_inputs, dec_inputs, labels = data
         enc_inputs, dec_inputs, labels = enc_inputs.cuda(), dec_inputs.cuda(), labels.cuda()
 
-        output = model(enc_inputs, dec_inputs)
-        y_pred = output[0]
+        if config.model == "conv1drnn":
+            y_pred = model(enc_inputs)
+        else:
+            output = model(enc_inputs, dec_inputs)
+            y_pred = output[0]
 
         loss = criterion(y_pred, labels)
 
@@ -123,7 +143,6 @@ def run(vocab_size=8000, verbose=True, early_stopping=True, separation=True):
     config.n_dec_vocab = vocab_size+7
 
     ### DATALOADER
-    if not separation:args['batch_size'] = int(args['batch_size']/4)
     ratio = [int(len(DataSet) * args['train_ratio']), len(DataSet) - int(len(DataSet) * args['train_ratio'])]
     train_set, val_set = torch.utils.data.random_split(DataSet, ratio)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=args['batch_size'],
@@ -132,7 +151,10 @@ def run(vocab_size=8000, verbose=True, early_stopping=True, separation=True):
                                              num_workers=2, collate_fn=collate_fn)
 
     ### MODEL
-    model = Classification(config)
+    if config.model == 'conv1drnn':
+        model = Conv1dRNN(512,3,config.dropout,config.n_dec_vocab,config.d_hidn,padding=1)
+    else:
+        model = Classification(config)
 
     ## CRITERION & OPTIMIZER & SECHEDULER
     criterion = nn.CrossEntropyLoss()
@@ -145,8 +167,8 @@ def run(vocab_size=8000, verbose=True, early_stopping=True, separation=True):
     ### RUN
     for i in range(args['Scheduler']['T_max']):
         model, train_loss, train_f1, train_acc = train(model, loader=train_loader, criterion=criterion,
-                                                       optimizer=optimizer)
-        model, eval_loss, eval_f1, eval_acc = evaluate(model, loader=val_loader, criterion=criterion)
+                                                       optimizer=optimizer, config=config)
+        model, eval_loss, eval_f1, eval_acc = evaluate(model, loader=val_loader, criterion=criterion, config=config)
         scheduler.step()
 
         history['train_losses'].append(train_loss)
@@ -166,8 +188,8 @@ def run(vocab_size=8000, verbose=True, early_stopping=True, separation=True):
             minimum_eval_loss = min(history['eval_losses'])
             if current_eval_loss > minimum_eval_loss:
                 patience += 1
-                if patience > 20:
-                    print(f'early stop at best epoch {best_epoch}')
+                if patience > 10:
+                    print(f'early stop at best epoch {best_epoch}, valloss = {minimum_eval_loss}')
                     break
             else:
                 best_model = model
