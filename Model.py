@@ -373,11 +373,11 @@ class Conv1dRNN(nn.Module):
         self.bi_rnn = nn.LSTM(self.hidden_dim, int(self.hidden_dim / 2), batch_first=True, bidirectional=True)
         self.uni_rnn = nn.LSTM(self.hidden_dim, self.hidden_dim, batch_first=True)
         self.max_pool = nn.AdaptiveAvgPool2d((1, self.hidden_dim))
-        self.linear = nn.Linear(self.hidden_dim, 1)
+        self.linear = nn.Linear(self.hidden_dim, 5)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.embedding(x).transpose(0, 1).transpose(1, 2)
+        x = self.embedding(x).transpose(1, 2)
         x = self.conv1d(x).transpose(1, 2).transpose(0, 1)
         x = self.gelu(x)
         x = self.dropout(x)
