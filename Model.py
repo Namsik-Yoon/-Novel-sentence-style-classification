@@ -369,7 +369,8 @@ class Conv1dRNN(nn.Module):
             self.embedding = nn.Embedding.from_pretrained(pre_trained_embedding, freeze=False, padding_idx=0)
         self.gelu = nn.GELU()
         self.dropout = nn.Dropout(self.dropout_rate)
-        self.conv1d = nn.Conv1d(self.embedding_dim, self.hidden_dim, self.filter_size, padding=self.padding)
+        self.conv1d_1 = nn.Conv1d(self.embedding_dim, self.hidden_dim, self.filter_size, padding=self.padding)
+        self.conv1d_2 = nn.Conv1d(self.hidden_dim, self.hidden_dim, self.filter_size+3, padding=self.padding+1)
         self.bi_rnn = nn.LSTM(self.hidden_dim, int(self.hidden_dim / 2), batch_first=True, bidirectional=True)
         self.uni_rnn = nn.LSTM(self.hidden_dim, self.hidden_dim, batch_first=True)
         self.max_pool = nn.AdaptiveAvgPool2d((1, self.hidden_dim))
@@ -377,14 +378,26 @@ class Conv1dRNN(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.embedding(x).transpose(1, 2)
-        x = self.conv1d(x).transpose(1, 2).transpose(0, 1)
+        # x = [batch_szie, seq_len]
+        x = self.embedding(x)
+        # x = [batch_size, seq_len, embedding_dim]
+        x = x.transpose(1, 2)
+        # x = [batch_size, embedding_dim, seq_len]
+        x = self.conv1d_1(x)
+        x = self.conv1d_2(x)
+        # x = [batch_size, hidden_dim, seq_len]
+        x = x.transpose(1, 2).transpose(0, 1)
+        # x = [seq_len, batch_size, hidden_dim]
         x = self.gelu(x)
         x = self.dropout(x)
         x_res = x
         x, _ = self.bi_rnn(x)
+        # x = [seq_len, batch_size, hidden_dim]
         x, _ = self.uni_rnn(x + x_res)
+        # x = [seq_len, batch_size, hidden_dim]
+        # x = [batch_size, seq_len, hidden_dim]
         x = self.dropout(x)
         x, _ = torch.max(x, 0)
+        # x = [batch_size, hidden_dim]
         x = self.linear(x)
         return x
