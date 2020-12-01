@@ -152,7 +152,7 @@ def run(vocab_size=8000, verbose=True, early_stopping=True, separation=True):
 
     ### MODEL
     if config.model == 'conv1drnn':
-        model = Conv1dRNN(512,3,config.dropout,config.n_dec_vocab,config.d_hidn,padding=1)
+        model = Conv1dRNN(512, 3, config.dropout, config.n_dec_vocab, config.d_hidn, padding=1)
     else:
         model = Classification(config)
 
